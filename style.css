@@ -1,0 +1,2298 @@
+/* ============================================================================
+   CLOCK — DESIGN v5
+   Idea: lo schermo è il colore della materia in corso. I numeri sono enormi e
+   condensati, leggibili dal fondo dell'aula; il righello dei secondi e la
+   striscia della giornata raccontano il tempo senza rubare spazio.
+   Tutto il colore deriva da pochi token qui sotto.
+   Font: Bricolage Grotesque (caricato in index.html).
+   ============================================================================ */
+
+/* --- TOKEN ---------------------------------------------------------------- */
+:root {
+    --font: 'Bricolage Grotesque', 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    /* Accento: blu inchiostro (la penna blu della scuola). Lo cambia script.js per i temi. */
+    --theme-color: #2340E8;
+
+    /* Colore di sfondo corrente (lo scrive script.js). Da qui deriva l'inchiostro. */
+    --paper: #D4D4D4;
+    --ink: #0E1018;
+    --on-bg: var(--ink);
+    --on-bg-soft: #3b3d46;
+
+    /* Superfici (finestre, pillola, pulsanti): bianche, piatte, con bordo sottile */
+    --surface: #ffffff;
+    --surface-2: #F3F4F8;
+    --surface-3: #E6E8EF;
+    --line: rgba(14, 16, 24, 0.12);
+    --text: #0E1018;
+    --muted: #5B6072;
+
+    /* Stati */
+    --danger: #D6361F;
+    --status-color: #0E7C3F;
+    --pulse-color: #22C55E;
+    --amber-bg: #FFF1CC;
+    --amber-fg: #7A5200;
+    --red-bg: #FDE4DF;
+    --red-fg: #8E1F10;
+
+    /* Misure fluide: la stessa interfaccia vale da telefono a LIM */
+    --dock: clamp(56px, 5.2vw, 76px);
+    --gutter: clamp(14px, 2.2vw, 36px);
+    --pill-h: clamp(54px, 4.8vw, 68px);
+    --ribbon-h: clamp(40px, 5.4vh, 60px);
+    --pad-x: clamp(22px, 2.6vw, 44px);
+    --ctl-h: clamp(56px, 3.3vw, 70px);
+    --ctl-fs: clamp(17px, 1.05vw, 22px);
+    --modal-w: clamp(560px, 34vw, 800px);
+    --dock-zone: calc(var(--dock) + var(--gutter) * 2);
+    --fit: 1;
+    --p: 0;
+}
+
+@supports (color: color-mix(in oklab, red, blue)) {
+    :root {
+        /* Inchiostro tinto dallo sfondo: scuro, ma con la stessa tonalità della materia */
+        --ink: color-mix(in oklab, var(--paper) 12%, #0b0c11);
+        --on-bg-soft: color-mix(in oklab, var(--ink) 74%, var(--paper));
+    }
+}
+
+/* --- BASE ----------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    font-family: var(--font);
+    color: var(--ink);
+    background-color: var(--paper);
+    overflow: hidden;
+    transition: background-color 1s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Un velo di luce in alto a sinistra: dà profondità al colore piatto */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 14% -10%, rgba(255, 255, 255, 0.5), transparent 58%);
+}
+
+::selection {
+    background-color: var(--theme-color);
+    color: #fff;
+}
+
+:focus-visible {
+    outline: 3px solid var(--theme-color);
+    outline-offset: 3px;
+}
+
+button:focus-visible,
+.icon-button:focus-visible {
+    outline-offset: 4px;
+}
+
+/* --- PALCOSCENICO --------------------------------------------------------- */
+.stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    padding:
+        calc(env(safe-area-inset-top, 0px) + var(--gutter)) calc(env(safe-area-inset-right, 0px) + var(--gutter)) calc(env(safe-area-inset-bottom, 0px) + var(--dock-zone)) calc(env(safe-area-inset-left, 0px) + var(--gutter));
+    pointer-events: none;
+}
+
+.stage>* {
+    pointer-events: auto;
+}
+
+/* --- STRISCIA DELLA GIORNATA ---------------------------------------------- */
+.day-ribbon {
+    position: relative;
+    padding-top: 8px;
+    transition: opacity 0.6s ease;
+}
+
+.day-ribbon[data-visible="false"] {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ribbon-track {
+    position: relative;
+    display: flex;
+    gap: clamp(4px, 0.5vw, 8px);
+    height: var(--ribbon-h);
+    --seg-bg: rgba(255, 255, 255, 0.55);
+    --seg-fg: var(--ink);
+}
+
+.ribbon-seg {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0 clamp(8px, 1vw, 18px);
+    border-radius: 14px;
+    border: 1.5px solid transparent;
+    background: var(--seg-bg);
+    color: var(--seg-fg);
+    font-size: clamp(12px, 1.25vw, 22px);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background-color 0.6s ease, color 0.6s ease, opacity 0.6s ease, border-color 0.6s ease;
+}
+
+.ribbon-seg::before {
+    content: '';
+    flex: none;
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    background: var(--m);
+}
+
+.seg-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ribbon-seg[data-state="past"] {
+    opacity: 0.42;
+}
+
+.ribbon-seg[data-state="now"] {
+    background: var(--m);
+    color: var(--m-fg);
+    border-color: var(--m);
+    font-weight: 700;
+}
+
+.ribbon-seg[data-state="now"]::before {
+    background: var(--m-fg);
+}
+
+.ribbon-seg.is-break {
+    padding: 0;
+    justify-content: center;
+}
+
+.ribbon-seg.is-break .seg-name {
+    display: none;
+}
+
+.ribbon-needle {
+    position: absolute;
+    z-index: 2;
+    /* parte dal bordo basso della striscia (8px di padding + altezza) e scende sotto di essa */
+    top: calc(8px + var(--ribbon-h) - 7px);
+    height: 22px;
+    left: 0;
+    width: 4px;
+    margin-left: -2px;
+    border-radius: 2px;
+    background: var(--on-bg);
+    box-shadow: 0 0 0 2px var(--needle-halo, var(--paper));
+    transition: transform 1s linear, opacity 0.5s ease;
+    pointer-events: none;
+}
+
+.ribbon-needle::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    width: 13px;
+    height: 13px;
+    margin-left: -6.5px;
+    border-radius: 50%;
+    background: var(--on-bg);
+    box-shadow: 0 0 0 2px var(--needle-halo, var(--paper));
+}
+
+.day-ribbon {
+    padding-bottom: 14px;
+}
+
+.day-ribbon[data-live="false"] .ribbon-needle {
+    opacity: 0.4;
+}
+
+/* --- OROLOGIO ------------------------------------------------------------- */
+.clock-container {
+    align-self: center;
+    justify-self: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    min-width: 0;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.clock-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+}
+
+.clock {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: calc(min(38vw, 57vh) * var(--fit, 1));
+    line-height: 0.88;
+    letter-spacing: -0.04em;
+    font-variation-settings: "wdth" 75, "opsz" 96;
+    font-variant-numeric: tabular-nums;
+    color: var(--on-bg);
+    white-space: nowrap;
+    text-shadow: none;
+    transition: color 0.6s ease;
+}
+
+.clock .separator {
+    margin: 0 0.07em;
+    position: relative;
+    top: -0.05em;
+    opacity: 0.85;
+}
+
+.clock .sep-sec {
+    display: none;
+}
+
+#seconds {
+    font-size: 0.23em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-left: 0.3em;
+    opacity: 0.72;
+    font-variation-settings: "wdth" 90, "opsz" 48;
+}
+
+/* Righello dei secondi: 60 tacche, ogni 5 una più lunga */
+.ruler {
+    position: relative;
+    height: clamp(18px, 3vh, 34px);
+    margin-top: clamp(16px, 3.2vh, 38px);
+    color: var(--on-bg);
+}
+
+.ruler-base,
+.ruler-fill {
+    position: absolute;
+    inset: 0;
+    -webkit-mask:
+        repeating-linear-gradient(90deg, #000 0 2px, transparent 2px calc(100% / 60)) 0 100% / 100% 50% no-repeat,
+        repeating-linear-gradient(90deg, #000 0 3px, transparent 3px calc(100% / 12)) 0 100% / 100% 100% no-repeat;
+    mask:
+        repeating-linear-gradient(90deg, #000 0 2px, transparent 2px calc(100% / 60)) 0 100% / 100% 50% no-repeat,
+        repeating-linear-gradient(90deg, #000 0 3px, transparent 3px calc(100% / 12)) 0 100% / 100% 100% no-repeat;
+}
+
+.ruler-base {
+    background: currentColor;
+    opacity: 0.22;
+}
+
+.ruler-fill {
+    background: var(--theme-color);
+    background: color-mix(in srgb, var(--subject, var(--theme-color)) 88%, var(--ink));
+    clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0);
+    transition: clip-path 1s linear, background-color 0.8s ease;
+}
+
+.ruler-fill.no-anim {
+    transition: none;
+}
+
+.date {
+    margin-top: clamp(16px, 3vh, 36px);
+    font-family: var(--font);
+    font-size: clamp(19px, 2.9vw, 54px);
+    font-weight: 500;
+    letter-spacing: -0.012em;
+    font-variation-settings: "wdth" 100, "opsz" 36;
+    color: var(--on-bg-soft);
+    transition: color 0.6s ease;
+}
+
+.date::first-letter {
+    text-transform: uppercase;
+}
+
+/* --- DOCK (pulsanti) ------------------------------------------------------- */
+.dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding:
+        0 calc(env(safe-area-inset-right, 0px) + var(--gutter)) calc(env(safe-area-inset-bottom, 0px) + var(--gutter)) calc(env(safe-area-inset-left, 0px) + var(--gutter));
+    pointer-events: none;
+}
+
+.dock>* {
+    pointer-events: auto;
+}
+
+.dock-tools {
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(8px, 0.9vw, 14px);
+}
+
+.icon-button {
+    flex: none;
+    min-width: var(--dock);
+    height: var(--dock);
+    padding: 0 14px;
+    border-radius: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: var(--surface);
+    color: var(--icon, var(--text));
+    border: 1.5px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.3s ease;
+}
+
+.icon-button i {
+    font-size: clamp(20px, 1.8vw, 28px);
+    line-height: 1;
+}
+
+.icon-label {
+    display: none;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+@media (min-width: 1600px) {
+    .icon-label {
+        display: block;
+    }
+}
+
+.icon-button:active {
+    transform: scale(0.93);
+}
+
+@media (hover: hover) {
+    .icon-button:hover {
+        background: var(--theme-color);
+        color: #fff;
+        border-color: var(--theme-color);
+    }
+}
+
+.icon-button.is-primary {
+    background: var(--theme-color);
+    color: #fff;
+    border-color: var(--theme-color);
+}
+
+.icon-button.is-disabled {
+    opacity: 0.35;
+    filter: grayscale(0.45);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* --- PILLOLA DI STATO ------------------------------------------------------ */
+.pulse {
+    display: inline-block;
+    position: relative;
+    margin-right: 12px;
+    width: 12px;
+    height: 12px;
+    flex: none;
+}
+
+.pulse-inner {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: var(--pulse-color);
+    will-change: transform;
+    animation: framer-pulse 2s infinite;
+}
+
+.pulse-fixed {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--pulse-color);
+}
+
+@keyframes framer-pulse {
+    0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(2.8745) rotate(337.409deg);
+        opacity: 0;
+    }
+}
+
+#status-pill {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--gutter));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    cursor: pointer;
+    background-color: #fff;
+    color: var(--text);
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--font);
+    font-size: clamp(14px, 1.15vw, 18px);
+    transition:
+        max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        max-height 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        min-height 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        min-width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        width 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        border-radius 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        background-color 0.3s ease,
+        padding 0.5s ease;
+
+    /* Stato chiuso: la larghezza segue il contenuto, l'altezza è fissa (JS la rilegge da min-height) */
+    width: auto;
+    min-width: clamp(210px, 17vw, 300px);
+    max-width: clamp(300px, 28vw, 460px);
+    height: auto;
+    min-height: var(--pill-h);
+    max-height: var(--pill-h);
+    padding: 0 clamp(20px, 1.8vw, 30px);
+}
+
+#status-pill.sync-view {
+    width: auto;
+}
+
+#status-pill.schedule-view {
+    min-width: clamp(260px, 22vw, 360px) !important;
+}
+
+#status-pill.expanded {
+    max-width: min(580px, calc(100vw - var(--gutter) * 2));
+    height: auto;
+    max-height: 80vh;
+    min-height: 140px;
+    border-radius: 30px;
+    padding: 22px;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    overflow-y: auto;
+}
+
+#sync-status {
+    white-space: nowrap;
+    text-align: center;
+    font-size: clamp(13px, 1.05vw, 17px);
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.widget-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.3s ease;
+}
+
+.widget-content {
+    display: none;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+.widget-content.active {
+    display: flex;
+}
+
+#schedule-widget {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.schedule-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    font-size: clamp(15px, 1.25vw, 20px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+#materia-percentuale {
+    font-variant-numeric: tabular-nums;
+}
+
+.progress-bar-container {
+    width: 100%;
+    background-color: var(--surface-3);
+    border-radius: 999px;
+    height: 10px;
+    overflow: hidden;
+}
+
+#materia-progress {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    transition: width 0.5s ease-out, background-color 0.5s ease;
+}
+
+/* Ore doppie: una traccia per ora */
+.progress-bar-double {
+    display: none;
+    width: 100%;
+    height: 10px;
+    gap: 5px;
+}
+
+#schedule-widget[data-double="true"] .progress-bar-container {
+    display: none;
+}
+
+#schedule-widget[data-double="true"] .progress-bar-double {
+    display: flex;
+}
+
+.progress-track {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 10px;
+    background-color: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    transition: width 0.5s ease-out, background-color 0.5s ease;
+}
+
+#events-widget {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    text-align: center;
+}
+
+.event-pill-summary {
+    font-size: clamp(14px, 1.15vw, 18px);
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#status-pill.expanded .event-pill-summary {
+    white-space: normal;
+}
+
+.events-expanded-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    padding: 2px 0 4px;
+    text-align: left;
+}
+
+.event-pill-day-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.event-pill-day-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0 0 2px 4px;
+    letter-spacing: -0.005em;
+}
+
+.event-pill-item {
+    background-color: var(--surface-2);
+    border-radius: 20px;
+    padding: 14px 16px;
+    min-width: 220px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.18s ease, background-color 0.2s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeInUp 0.4s ease forwards;
+}
+
+.event-pill-item:active,
+.day-detail-item:active {
+    transform: scale(0.98);
+}
+
+.event-pill-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.event-pill-item-subject {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+.event-pill-item-type-badge {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background-color: var(--surface-3);
+    color: var(--muted);
+}
+
+.event-pill-item.type-interrogazione .event-pill-item-type-badge,
+.day-detail-item.type-interrogazione .event-pill-item-type-badge {
+    background-color: var(--amber-bg);
+    color: var(--amber-fg);
+}
+
+.event-pill-item.type-verifica .event-pill-item-type-badge,
+.day-detail-item.type-verifica .event-pill-item-type-badge {
+    background-color: var(--red-bg);
+    color: var(--red-fg);
+}
+
+.event-pill-item-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    color: var(--muted);
+}
+
+.event-pill-item-details i {
+    font-size: 13px;
+    opacity: 0.75;
+}
+
+.open-calendar-btn {
+    width: 100%;
+    margin: 6px 0 0;
+    min-height: 52px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    border-radius: 20px;
+    font-size: 16px;
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Sfumatura che accompagna i temi con foto */
+#event-blur-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 250px;
+    pointer-events: none;
+    z-index: 0;
+    backdrop-filter: blur(120px);
+    -webkit-backdrop-filter: blur(120px);
+    background: transparent;
+    -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 100%);
+    mask-image: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 100%);
+}
+
+body.halloween-theme #event-blur-overlay {
+    background: rgb(29, 11, 43);
+}
+
+
+/* --- Sfondo animato: variabili registrate (permettono la transizione fluida dei colori) --- */
+:root {
+    --bg-anim-base: #D4D4D4;
+    --bg-anim-light: #F0F2F4;
+    --bg-anim-mid: #C5C9CE;
+    --bg-anim-deep: #A8B0B8;
+}
+
+@property --bg-anim-base {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #D4D4D4;
+}
+
+@property --bg-anim-light {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #F0F2F4;
+}
+
+@property --bg-anim-mid {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #C5C9CE;
+}
+
+@property --bg-anim-deep {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #A8B0B8;
+}
+
+/* --- FINESTRE (base) -------------------------------------------------------
+   script.js apre/chiude le finestre scrivendo display/opacity/transform inline
+   (centrate con translate(-50%, -50%)): la posizione resta questa. */
+.overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: none;
+    background-color: rgba(14, 16, 24, 0.42);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    backdrop-filter: blur(14px) saturate(1.1);
+    transition: opacity 0.25s ease;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    z-index: 1001;
+    width: min(92vw, var(--modal-w));
+    max-height: calc(100vh - var(--gutter) * 2);
+    max-height: calc(100dvh - var(--gutter) * 2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0;
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--line);
+    border-radius: 32px;
+    font-family: var(--font);
+    transition: opacity 0.3s ease, transform 0.38s cubic-bezier(0.2, 0.9, 0.25, 1);
+    scrollbar-width: thin;
+}
+
+.modal-header {
+    padding: clamp(22px, 2.4vw, 32px) var(--pad-x) 6px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: clamp(25px, 2.3vw, 36px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.028em;
+    font-variation-settings: "wdth" 90, "opsz" 48;
+}
+
+.modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 18px var(--pad-x) clamp(20px, 2.2vw, 28px);
+    background: linear-gradient(to top, var(--surface) 72%, rgba(255, 255, 255, 0));
+}
+
+.footer-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* --- PULSANTI ---------------------------------------------------------------- */
+button {
+    margin: 0;
+    min-height: var(--ctl-h);
+    padding: 0 26px;
+    border: none;
+    border-radius: 18px;
+    background-color: var(--theme-color);
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: var(--font);
+    font-size: var(--ctl-fs);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) {
+    button:hover {
+        filter: brightness(1.1);
+    }
+}
+
+button:disabled {
+    cursor: not-allowed;
+}
+
+.btn-ghost {
+    background-color: var(--surface-2);
+    color: var(--text);
+}
+
+.btn-danger {
+    background-color: var(--danger);
+}
+
+.offline-badge {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background-color: var(--surface-3);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: middle;
+}
+
+/* --- CAMPI -------------------------------------------------------------------- */
+select,
+.form-group input[type="date"] {
+    display: block;
+    width: 100%;
+    min-height: var(--ctl-h);
+    margin-top: 8px;
+    padding: 0 48px 0 18px;
+    border: 1.5px solid var(--line);
+    border-radius: 18px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--ctl-fs);
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1.5l6 6 6-6' fill='none' stroke='%235B6072' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 20px center;
+}
+
+.form-group input[type="date"] {
+    padding-right: 18px;
+}
+
+select:focus,
+.form-group input[type="date"]:focus {
+    outline: none;
+    border-color: var(--theme-color);
+    background-color: var(--surface);
+}
+
+#weightSelect {
+    display: none;
+}
+
+#backgroundSelect option:disabled {
+    color: #b0b0b0;
+    font-style: italic;
+}
+
+/* Interruttori */
+.toggle-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    min-height: 60px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1.5px solid var(--line);
+}
+
+.toggle-label {
+    font-size: var(--ctl-fs);
+    font-weight: 500;
+    color: var(--text);
+}
+
+.toggle {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 64px;
+    height: 36px;
+    cursor: pointer;
+}
+
+.toggle input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background-color: #C5C9D6;
+    transition: background-color 0.25s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #fff;
+    transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+input:checked+.toggle-slider {
+    background-color: var(--theme-color);
+}
+
+input:checked+.toggle-slider::before {
+    transform: translateX(28px);
+}
+
+.toggle input:focus-visible+.toggle-slider {
+    outline: 3px solid var(--theme-color);
+    outline-offset: 3px;
+}
+
+.toggle-container.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    user-select: none;
+}
+
+.toggle-container.is-disabled .toggle,
+.toggle input:disabled+.toggle-slider {
+    cursor: not-allowed;
+}
+
+/* --- IMPOSTAZIONI / INFO ---------------------------------------------------- */
+.settings-content {
+    padding: 4px var(--pad-x) 0;
+}
+
+.settings-section {
+    margin: 22px 0 8px;
+}
+
+.settings-section h4 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--muted);
+}
+
+.settings-section button {
+    width: 100%;
+    margin-top: 8px;
+}
+
+#forceSync {
+    background-color: var(--surface-2);
+    color: var(--text);
+}
+
+#infoModal p {
+    margin: 0;
+    padding: 12px var(--pad-x) 0;
+    font-size: clamp(18px, 1.15vw, 23px);
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+#infoModal p a {
+    color: var(--text) !important;
+    font-weight: 600;
+}
+
+/* --- ORARIO SCOLASTICO -------------------------------------------------------- */
+#scheduleModal {
+    width: min(96vw, 1560px);
+}
+
+.schedule-table-container {
+    margin: 10px var(--pad-x) 0;
+    padding: clamp(6px, 1vw, 14px);
+    background-color: var(--surface-2);
+    border-radius: 24px;
+    overflow-x: auto;
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: clamp(4px, 0.6vw, 8px);
+    font-size: clamp(13px, 1.35vw, 20px);
+}
+
+.schedule-table th,
+.schedule-table td {
+    padding: clamp(8px, 1.3vw, 18px) clamp(4px, 0.8vw, 12px);
+    text-align: center;
+    border: none;
+    border-radius: 14px;
+}
+
+.schedule-table th {
+    background-color: var(--text);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    transition: background-color 0.3s ease;
+}
+
+/* Le caselle prendono il colore della materia: --m e --m-bg li imposta colorScheduleTable() */
+.schedule-table td {
+    --m: #757575;
+    --m-bg: #ffffff;
+    background-color: var(--m-bg);
+    color: #1a1a1a;
+    color: color-mix(in srgb, var(--m) 55%, #000);
+    border-bottom: 4px solid var(--m);
+    font-weight: 700;
+    vertical-align: middle;
+    transition: background-color 0.3s ease;
+}
+
+.schedule-table .current-day {
+    background-color: var(--theme-color) !important;
+}
+
+/* --- GESTIONE EVENTI ------------------------------------------------------------ */
+.event-management-modal {
+    width: min(95vw, clamp(640px, 42vw, 920px));
+}
+
+.event-management-content {
+    padding: 8px var(--pad-x) 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.event-management-content::-webkit-scrollbar {
+    display: none;
+}
+
+.new-event-btn {
+    width: 100%;
+    min-height: 60px;
+    margin-bottom: 22px;
+    font-size: 18px;
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+}
+
+.event-day-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.event-day-label {
+    margin: 0 0 2px 4px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--muted);
+}
+
+.event-item {
+    width: 100%;
+    padding: 16px 18px;
+    background-color: var(--surface-2);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: transform 0.18s ease, background-color 0.2s ease;
+}
+
+.event-item:active {
+    transform: scale(0.985);
+}
+
+.event-item-type {
+    display: none;
+    /* Nascosto alla vista pubblica */
+}
+
+.event-item-subject {
+    margin-bottom: 4px;
+    font-size: clamp(20px, 1.3vw, 26px);
+    font-weight: 700;
+    letter-spacing: -0.012em;
+}
+
+.event-item-details {
+    font-size: clamp(16px, 1vw, 20px);
+    color: var(--muted);
+}
+
+/* Modulo evento */
+.event-form-modal {
+    width: min(95vw, clamp(640px, 42vw, 920px));
+}
+
+.event-form-content {
+    padding: 8px var(--pad-x) 0;
+}
+
+.form-group {
+    margin-bottom: 22px;
+    width: 100%;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--muted);
+}
+
+.type-toggle {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 6px;
+    background-color: var(--surface-2);
+    border-radius: 24px;
+}
+
+.type-option {
+    flex: 1;
+    min-height: 52px;
+    padding: 0 12px;
+    border-radius: 18px;
+    background-color: transparent;
+    color: var(--muted);
+}
+
+.type-option.active {
+    background-color: var(--theme-color);
+    color: #fff;
+}
+
+@media (hover: hover) {
+    .type-option:not(.active):hover {
+        background-color: var(--surface-3);
+        filter: none;
+    }
+}
+
+/* Contatore interrogati */
+.student-counter-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    margin: 8px 0 14px;
+    padding: 12px;
+    background-color: var(--surface-2);
+    border-radius: 28px;
+}
+
+.counter-btn {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 22px;
+}
+
+.counter-display {
+    min-width: 60px;
+    text-align: center;
+    font-size: 46px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+}
+
+.select-volunteers-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 18px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    border: 1.5px solid var(--line);
+    font-weight: 500;
+}
+
+.selected-volunteers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.volunteer-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 15px;
+    border-radius: 999px;
+    background-color: var(--surface-2);
+    color: var(--text);
+    border: 1.5px solid var(--line);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+    .volunteer-tag {
+        background-color: color-mix(in srgb, var(--theme-color) 10%, #fff);
+        border-color: color-mix(in srgb, var(--theme-color) 30%, #fff);
+        color: var(--theme-color);
+    }
+}
+
+.random-btn {
+    background-color: #E8710A;
+}
+
+/* Selezione volontari */
+.volunteers-modal {
+    width: min(94vw, clamp(700px, 46vw, 1000px));
+}
+
+.volunteers-content {
+    padding: 8px var(--pad-x) 0;
+}
+
+.volunteers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.volunteer-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: calc(var(--ctl-h) + 2px);
+    padding: 0 16px;
+    background-color: var(--surface-2);
+    border: 1.5px solid transparent;
+    border-radius: 18px;
+    font-size: var(--ctl-fs);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.volunteer-checkbox input[type="checkbox"] {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--theme-color);
+}
+
+.volunteer-checkbox input[type="checkbox"]:checked+span {
+    font-weight: 700;
+    color: var(--theme-color);
+}
+
+.volunteer-checkbox:has(input:checked) {
+    border-color: var(--theme-color);
+    background-color: var(--surface);
+}
+
+/* Codice di accesso (al momento aggirato in script.js, ma presente) */
+#passcodeModal {
+    width: min(88vw, 420px);
+}
+
+.passcode-content {
+    padding: 8px var(--pad-x) 0;
+    text-align: center;
+}
+
+.passcode-hint {
+    margin: 0 0 18px;
+    color: var(--muted);
+}
+
+#passcodeInput {
+    width: 100%;
+    max-width: 260px;
+    min-height: 68px;
+    padding: 0 0 0 0.5em;
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    background-color: var(--surface-2);
+    font-family: var(--font);
+    font-size: 30px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.5em;
+    font-variant-numeric: tabular-nums;
+}
+
+#passcodeInput:focus {
+    outline: none;
+    border-color: var(--theme-color);
+}
+
+.passcode-error {
+    margin-top: 12px;
+    color: var(--danger);
+    font-weight: 600;
+    text-align: center;
+}
+
+/* --- ANTEPRIMA EVENTO ---------------------------------------------------------- */
+.event-preview-modal {
+    width: min(92vw, clamp(500px, 30vw, 680px));
+}
+
+.event-preview-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 14px;
+}
+
+.preview-type-chip {
+    flex: none;
+    padding: 7px 15px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.preview-type-chip.interrogazione {
+    background-color: var(--amber-bg);
+    color: var(--amber-fg);
+}
+
+.preview-type-chip.verifica {
+    background-color: var(--red-bg);
+    color: var(--red-fg);
+}
+
+.preview-content {
+    padding: 4px var(--pad-x) 0;
+}
+
+.preview-countdown {
+    margin-bottom: 14px;
+    padding: 18px;
+    background-color: var(--surface-2);
+    border-radius: 22px;
+    text-align: center;
+    font-size: clamp(21px, 2vw, 28px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variation-settings: "wdth" 90, "opsz" 48;
+}
+
+.preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1.5px solid var(--line);
+}
+
+.preview-row:last-of-type {
+    border-bottom: none;
+}
+
+.preview-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.preview-label i {
+    width: 20px;
+    text-align: center;
+    color: var(--theme-color);
+}
+
+.preview-value {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.preview-section {
+    margin-top: 12px;
+    padding: 16px;
+    background-color: var(--surface-2);
+    border-radius: 22px;
+}
+
+.preview-section .preview-label {
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.preview-volunteers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.preview-volunteer-item {
+    padding: 8px 15px;
+    background-color: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* --- CALENDARIO MENSILE ---------------------------------------------------------- */
+.month-calendar-modal {
+    width: min(95vw, clamp(640px, 42vw, 940px));
+    overflow-x: hidden;
+}
+
+.calendar-nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background-color: var(--theme-color);
+    color: #fff;
+}
+
+.calendar-nav-header h3 {
+    font-size: clamp(22px, 2.1vw, 30px);
+}
+
+.calendar-nav-btn {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 18px;
+}
+
+.calendar-body {
+    padding: 14px var(--pad-x) 0;
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.month-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.calendar-day-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: clamp(48px, 8.4vh, 84px);
+    padding-top: clamp(6px, 1.2vh, 11px);
+    background-color: var(--surface-2);
+    border-radius: 16px;
+    font-size: clamp(16px, 1.4vw, 21px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.calendar-day-cell:active {
+    transform: scale(0.95);
+}
+
+.calendar-day-cell.empty {
+    background-color: transparent;
+    cursor: default;
+}
+
+.calendar-day-cell.today {
+    background-color: var(--surface);
+    color: var(--theme-color);
+    box-shadow: inset 0 0 0 2.5px var(--theme-color);
+}
+
+.calendar-day-cell.disabled {
+    opacity: 0.38;
+    cursor: default;
+    pointer-events: none;
+}
+
+.calendar-day-cell.has-events {
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .calendar-day-cell:not(.disabled):not(.empty):hover {
+        background-color: var(--surface-3);
+    }
+}
+
+.event-dots-container {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.event-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.event-dot.interrogazione {
+    background-color: #F2A900;
+}
+
+.event-dot.verifica {
+    background-color: #D6361F;
+}
+
+/* Dettaglio giorno */
+.day-detail-modal {
+    width: min(92vw, clamp(500px, 30vw, 680px));
+}
+
+.day-detail-content {
+    padding: 8px var(--pad-x) 0;
+}
+
+.day-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.day-detail-item {
+    padding: 14px 16px;
+    background-color: var(--surface-2);
+    border-radius: 20px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.18s ease;
+}
+
+/* --- CALENDARIO DELL'AVVENTO (tema Natale) ---------------------------------------- */
+#calendarModal {
+    overflow-x: hidden;
+}
+
+.calendar-header-wrapper {
+    position: relative;
+    overflow: hidden;
+    padding: 34px 20px;
+    text-align: center;
+    color: #fff;
+    background: linear-gradient(to top right, #c0392b, #ef5350);
+}
+
+.snow-container {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.snowflake {
+    position: absolute;
+    top: -10px;
+    z-index: 1000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 1em;
+    user-select: none;
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes fall {
+    0% {
+        transform: translateY(-10px) translateX(0);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translateY(200px) translateX(20px);
+        opacity: 0;
+    }
+}
+
+.calendar-header-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.days-count {
+    font-size: clamp(56px, 6vw, 84px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variation-settings: "wdth" 75, "opsz" 96;
+}
+
+.countdown-label {
+    margin-top: 6px;
+    font-size: 20px;
+    font-weight: 500;
+    opacity: 0.92;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.calendar-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendar-day.active {
+    background-color: #dc2626;
+    border-color: #dc2626;
+    color: #fff;
+}
+
+.calendar-day.future-month {
+    background-color: var(--surface-2);
+    border-color: var(--surface-2);
+    color: #b9bdc9;
+}
+
+#closeCalendarModal {
+    background-color: #dc2626;
+}
+
+/* --- TEMI A EVENTO ------------------------------------------------------------------
+   script.js aggiunge/toglie la classe sul body e imposta --theme-color.
+   Sullo sfondo c'è una foto: il testo diventa bianco, i pulsanti restano bianchi
+   con l'icona nel colore del tema. */
+body.christmas-theme,
+body.stranger-things-theme,
+body.halloween-theme {
+    --on-bg: #ffffff;
+    --on-bg-soft: rgba(255, 255, 255, 0.86);
+    --icon: var(--theme-color);
+    --status-color: var(--theme-color);
+    --pulse-color: var(--theme-color);
+    --needle-halo: rgba(0, 0, 0, 0.35);
+}
+
+body.christmas-theme::before,
+body.stranger-things-theme::before,
+body.halloween-theme::before {
+    display: none;
+}
+
+body.christmas-theme .ribbon-track,
+body.stranger-things-theme .ribbon-track,
+body.halloween-theme .ribbon-track {
+    --seg-bg: rgba(255, 255, 255, 0.2);
+    --seg-fg: #ffffff;
+}
+
+body.christmas-theme .ribbon-seg,
+body.stranger-things-theme .ribbon-seg,
+body.halloween-theme .ribbon-seg {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+body.christmas-theme .ruler-fill,
+body.stranger-things-theme .ruler-fill,
+body.halloween-theme .ruler-fill {
+    background: #ffffff;
+}
+
+body.christmas-theme .icon-button.is-primary,
+body.stranger-things-theme .icon-button.is-primary,
+body.halloween-theme .icon-button.is-primary {
+    background: #fff;
+    border-color: #fff;
+    color: var(--theme-color);
+}
+
+body.christmas-theme #githubIcon,
+body.stranger-things-theme #githubIcon,
+body.halloween-theme #githubIcon {
+    background: var(--theme-color);
+    border-color: var(--theme-color);
+    color: #fff;
+}
+
+/* --- MOBILE E SCHERMI PICCOLI ------------------------------------------------------- */
+@media (max-width: 1000px) {
+
+    /* Il dock occupa tutta la riga: la pillola sale sopra */
+    :root {
+        --dock-zone: calc(var(--dock) + var(--pill-h) + var(--gutter) * 2 + 12px);
+    }
+
+    #status-pill {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + var(--gutter) + var(--dock) + 12px);
+        max-width: calc(100vw - var(--gutter) * 2);
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --dock: clamp(40px, 11.5vw, 50px);
+        --gutter: 14px;
+        --pill-h: 50px;
+        --pad-x: 22px;
+        --ribbon-h: 40px;
+        --ctl-h: 54px;
+        --ctl-fs: 16px;
+        --modal-w: 94vw;
+    }
+
+    .dock {
+        gap: 8px;
+    }
+
+    .dock-tools {
+        gap: 4px;
+    }
+
+    .icon-button {
+        padding: 0 8px;
+        border-radius: 15px;
+    }
+
+    .icon-button i {
+        font-size: 18px;
+    }
+
+    .modal {
+        width: 94vw;
+        border-radius: 26px;
+    }
+
+    .ribbon-seg {
+        padding: 0 6px;
+        gap: 5px;
+        border-radius: 10px;
+        font-size: 12px;
+    }
+
+    .ribbon-seg .seg-name {
+        font-size: 0;
+    }
+
+    .ribbon-seg .seg-name::after {
+        content: attr(data-short);
+        font-size: 12px;
+    }
+
+    #seconds {
+        font-size: 0.2em;
+    }
+
+    .volunteers-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* 6 giorni in ~350px: colonne uguali, testo compatto, niente scroll orizzontale */
+    .schedule-table-container {
+        margin-left: 8px;
+        margin-right: 8px;
+        padding: 3px;
+        border-radius: 18px;
+    }
+
+    .schedule-table {
+        table-layout: fixed;
+        border-spacing: 3px;
+        font-size: 10.5px;
+        letter-spacing: -0.02em;
+    }
+
+    .schedule-table th,
+    .schedule-table td {
+        padding: 10px 0;
+        border-radius: 9px;
+        font-size: clamp(9.5px, 2.7vw, 11px);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        font-variation-settings: "wdth" 75, "opsz" 12;
+        overflow-wrap: normal;
+        hyphens: manual;
+    }
+
+    .schedule-table td {
+        border-bottom-width: 3px;
+    }
+
+    .calendar-grid {
+        gap: 6px;
+    }
+
+    .calendar-day {
+        border-radius: 11px;
+        font-size: 15px;
+    }
+
+    .month-calendar-grid,
+    .calendar-weekdays {
+        gap: 5px;
+    }
+
+    .event-pill-item {
+        min-width: 0;
+    }
+
+    .modal-footer {
+        flex-wrap: wrap;
+    }
+}
+
+/* In verticale le cifre si impilano: ore sopra, minuti sotto */
+@media (orientation: portrait) {
+    .clock {
+        flex-direction: column;
+        align-items: center;
+        font-size: calc(min(62vw, 31vh) * var(--fit, 1));
+        line-height: 0.8;
+    }
+
+    /* il righello occupa tutta la larghezza: le tacche restano distinte */
+    .clock-container,
+    .clock-stack {
+        width: 100%;
+    }
+
+    .clock .separator {
+        display: none;
+    }
+
+    #seconds {
+        margin: 0.34em 0 0;
+        font-size: 0.17em;
+        letter-spacing: 0.02em;
+    }
+
+    .ruler {
+        margin-top: clamp(14px, 2.4vh, 28px);
+    }
+
+    .date {
+        font-size: clamp(18px, 5.2vw, 34px);
+    }
+}
+
+/* Telefono in orizzontale: poco spazio verticale */
+@media (max-height: 480px) and (orientation: landscape) {
+    .clock {
+        font-size: calc(min(30vw, 40vh) * var(--fit, 1));
+    }
+
+    .date {
+        margin-top: 8px;
+        font-size: clamp(16px, 2.6vw, 26px);
+    }
+
+    .ruler {
+        margin-top: 10px;
+        height: 16px;
+    }
+}
+
+/* --- MOVIMENTO RIDOTTO ---------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+
+    .ruler-fill,
+    .ribbon-needle,
+    .ribbon-seg,
+    .modal,
+    #status-pill {
+        transition-duration: 0.01ms !important;
+    }
+
+    .pulse-inner {
+        animation: none;
+    }
+
+    .event-pill-item {
+        animation-duration: 0.01ms;
+    }
+}
+
+/* --- SFONDO ANIMATO (mesh gradient, invariato) ------------------------------------------- */
+/* --- SFONDO ANIMATO (mesh gradient screensaver) --- */
+#bg-animation {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    contain: paint;
+    transition: opacity 0.9s ease, visibility 0.9s ease;
+}
+
+body.bg-animated #bg-animation {
+    opacity: 1;
+    visibility: visible;
+}
+
+.bg-wash {
+    position: absolute;
+    top: -30%;
+    left: -30%;
+    width: 160%;
+    height: 160%;
+    background: linear-gradient(
+        125deg,
+        var(--bg-anim-base) 0%,
+        var(--bg-anim-light) 28%,
+        var(--bg-anim-mid) 54%,
+        var(--bg-anim-deep) 78%,
+        var(--bg-anim-base) 100%
+    );
+    background-size: 240% 240%;
+    animation: bgWashDrift 32s ease-in-out infinite;
+    will-change: transform, background-position;
+}
+
+.bg-orb {
+    position: absolute;
+    pointer-events: none;
+    will-change: transform, border-radius;
+}
+
+.bg-orb-a {
+    width: 95vmin;
+    height: 95vmin;
+    top: -28%;
+    left: -22%;
+    background: radial-gradient(
+        circle at 50% 50%,
+        var(--bg-anim-light) 0%,
+        color-mix(in srgb, var(--bg-anim-light) 55%, transparent) 42%,
+        transparent 72%
+    );
+    border-radius: 42% 58% 56% 44% / 46% 44% 56% 54%;
+    animation: bgOrbA 26s ease-in-out infinite;
+}
+
+.bg-orb-b {
+    width: 85vmin;
+    height: 85vmin;
+    right: -24%;
+    bottom: -26%;
+    background: radial-gradient(
+        circle at 50% 50%,
+        var(--bg-anim-deep) 0%,
+        color-mix(in srgb, var(--bg-anim-deep) 50%, transparent) 40%,
+        transparent 70%
+    );
+    border-radius: 58% 42% 44% 56% / 52% 48% 52% 48%;
+    opacity: 0.88;
+    animation: bgOrbB 34s ease-in-out infinite;
+}
+
+.bg-orb-c {
+    width: 70vmin;
+    height: 70vmin;
+    top: 28%;
+    left: 38%;
+    background: radial-gradient(
+        circle at 50% 50%,
+        var(--bg-anim-mid) 0%,
+        color-mix(in srgb, var(--bg-anim-mid) 45%, transparent) 38%,
+        transparent 68%
+    );
+    border-radius: 46% 54% 42% 58% / 58% 42% 58% 42%;
+    opacity: 0.75;
+    animation: bgOrbC 30s ease-in-out infinite;
+}
+
+#bg-animation::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+        ellipse at center,
+        transparent 42%,
+        color-mix(in srgb, var(--bg-anim-deep) 8%, transparent) 100%
+    );
+    z-index: 2;
+    backdrop-filter: blur(20px);
+}
+
+@keyframes bgWashDrift {
+    0% {
+        background-position: 0% 45%;
+        transform: rotate(0deg) scale(1.08);
+    }
+    25% {
+        background-position: 65% 35%;
+        transform: rotate(-6deg) scale(1.22);
+    }
+    50% {
+        background-position: 100% 55%;
+        transform: rotate(7deg) scale(1.18);
+    }
+    75% {
+        background-position: 35% 70%;
+        transform: rotate(5deg) scale(1.14);
+    }
+    100% {
+        background-position: 0% 45%;
+        transform: rotate(0deg) scale(1.08);
+    }
+}
+
+@keyframes bgOrbA {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        border-radius: 42% 58% 56% 44% / 46% 44% 56% 54%;
+    }
+    25% {
+        transform: translate3d(16vw, 12vh, 0) scale(1.12);
+        border-radius: 58% 42% 44% 56% / 44% 56% 46% 54%;
+    }
+    50% {
+        transform: translate3d(6vw, 26vh, 0) scale(0.94);
+        border-radius: 50% 50% 38% 62% / 40% 60% 40% 60%;
+    }
+    75% {
+        transform: translate3d(-12vw, 8vh, 0) scale(1.08);
+        border-radius: 38% 62% 58% 42% / 62% 38% 62% 38%;
+    }
+    100% {
+        transform: translate3d(0, 0, 0) scale(1);
+        border-radius: 42% 58% 56% 44% / 46% 44% 56% 54%;
+    }
+}
+
+@keyframes bgOrbB {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1.04);
+        border-radius: 58% 42% 44% 56% / 52% 48% 52% 48%;
+    }
+    25% {
+        transform: translate3d(-18vw, -10vh, 0) scale(0.9);
+        border-radius: 42% 58% 62% 38% / 48% 52% 48% 52%;
+    }
+    50% {
+        transform: translate3d(-8vw, -22vh, 0) scale(1.14);
+        border-radius: 60% 40% 48% 52% / 40% 60% 40% 60%;
+    }
+    75% {
+        transform: translate3d(14vw, -6vh, 0) scale(1);
+        border-radius: 46% 54% 40% 60% / 56% 44% 56% 44%;
+    }
+    100% {
+        transform: translate3d(0, 0, 0) scale(1.04);
+        border-radius: 58% 42% 44% 56% / 52% 48% 52% 48%;
+    }
+}
+
+@keyframes bgOrbC {
+    0% {
+        transform: translate3d(0, 0, 0) scale(0.96);
+        border-radius: 46% 54% 42% 58% / 58% 42% 58% 42%;
+    }
+    33% {
+        transform: translate3d(-20vw, -14vh, 0) scale(1.1);
+        border-radius: 60% 40% 55% 45% / 40% 60% 40% 60%;
+    }
+    66% {
+        transform: translate3d(12vw, 16vh, 0) scale(1.04);
+        border-radius: 40% 60% 48% 52% / 62% 38% 55% 45%;
+    }
+    100% {
+        transform: translate3d(0, 0, 0) scale(0.96);
+        border-radius: 46% 54% 42% 58% / 58% 42% 58% 42%;
+    }
+}
+
+.bg-wash,
+.bg-orb {
+    animation-play-state: paused;
+}
+
+body.bg-animated:not(.bg-paused) #bg-animation .bg-wash,
+body.bg-animated:not(.bg-paused) #bg-animation .bg-orb {
+    animation-play-state: running;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bg-wash,
+    .bg-orb-a,
+    .bg-orb-b,
+    .bg-orb-c {
+        animation: none !important;
+    }
+
+    .bg-wash {
+        transform: scale(1.12);
+        background-position: 40% 50%;
+    }
+}
