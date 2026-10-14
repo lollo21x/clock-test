@@ -11,8 +11,8 @@
 :root {
     --font: 'Bricolage Grotesque', 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-    /* Accento: blu inchiostro (la penna blu della scuola). Lo cambia script.js per i temi. */
-    --theme-color: #2340E8;
+    /* Accento: il verde originale. Lo cambia script.js per i temi a evento. */
+    --theme-color: #1b912b;
 
     /* Colore di sfondo corrente (lo scrive script.js). Da qui deriva l'inchiostro. */
     --paper: #D4D4D4;
@@ -30,7 +30,7 @@
 
     /* Stati */
     --danger: #D6361F;
-    --status-color: #0E7C3F;
+    --status-color: #1b912b;
     --pulse-color: #22C55E;
     --amber-bg: #FFF1CC;
     --amber-fg: #7A5200;
@@ -38,7 +38,7 @@
     --red-fg: #8E1F10;
 
     /* Misure fluide: la stessa interfaccia vale da telefono a LIM */
-    --dock: clamp(56px, 5.2vw, 76px);
+    --dock: clamp(50px, 3.4vw, 60px);
     --gutter: clamp(14px, 2.2vw, 36px);
     --pill-h: clamp(54px, 4.8vw, 68px);
     --ribbon-h: clamp(40px, 5.4vh, 60px);
@@ -242,7 +242,9 @@ button:focus-visible,
     opacity: 0.4;
 }
 
-/* --- OROLOGIO ------------------------------------------------------------- */
+/* --- OROLOGIO -------------------------------------------------------------
+   Di default è piccolo come nella versione originale (5rem), ma con il font nuovo.
+   Il toggle "Orologio grande" nelle Impostazioni aggiunge body.clock-large. */
 .clock-container {
     align-self: center;
     justify-self: center;
@@ -269,10 +271,10 @@ button:focus-visible,
     justify-content: center;
     font-family: var(--font);
     font-weight: 700;
-    font-size: calc(min(38vw, 57vh) * var(--fit, 1));
-    line-height: 0.88;
-    letter-spacing: -0.04em;
-    font-variation-settings: "wdth" 75, "opsz" 96;
+    font-size: calc(5rem * var(--fit, 1));
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    font-variation-settings: "wdth" 100, "opsz" 72;
     font-variant-numeric: tabular-nums;
     color: var(--on-bg);
     white-space: nowrap;
@@ -281,17 +283,100 @@ button:focus-visible,
 }
 
 .clock .separator {
-    margin: 0 0.07em;
+    margin: 0 0.14em;
     position: relative;
-    top: -0.05em;
+    top: -0.04em;
     opacity: 0.85;
 }
 
-.clock .sep-sec {
+/* Righello dei secondi: 60 tacche (una per secondo), ogni 5 una più lunga.
+   Le tacche le crea script.js (#rulerTicks) e si accendono una alla volta. */
+.ruler {
+    --tick-on: var(--subject, var(--theme-color));
+    position: relative;
+    height: clamp(12px, 1.7vh, 17px);
+    margin-top: clamp(10px, 1.7vh, 18px);
+    color: var(--on-bg);
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+    .ruler {
+        --tick-on: color-mix(in srgb, var(--subject, var(--theme-color)) 88%, var(--ink));
+    }
+}
+
+.ruler-ticks {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+}
+
+.ruler-ticks i {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+}
+
+.ruler-ticks i::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    height: 55%;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.22;
+    transition: opacity 0.35s ease, background-color 0.35s ease;
+}
+
+.ruler-ticks i.major::before {
+    height: 100%;
+    width: 3px;
+    margin-left: -1.5px;
+}
+
+.ruler-ticks i.on::before {
+    opacity: 1;
+    background: var(--tick-on);
+}
+
+.date {
+    margin-top: 1rem;
+    font-family: var(--font);
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    font-variation-settings: "wdth" 100, "opsz" 36;
+    color: var(--on-bg-soft);
+    transition: color 0.6s ease;
+}
+
+.date::first-letter {
+    text-transform: uppercase;
+}
+
+/* --- OROLOGIO GRANDE (toggle nelle Impostazioni) --------------------------- */
+body.clock-large .clock {
+    font-size: calc(min(38vw, 57vh) * var(--fit, 1));
+    line-height: 0.88;
+    letter-spacing: -0.04em;
+    font-variation-settings: "wdth" 75, "opsz" 96;
+}
+
+body.clock-large .clock .separator {
+    margin: 0 0.07em;
+    top: -0.05em;
+}
+
+body.clock-large .clock .sep-sec {
     display: none;
 }
 
-#seconds {
+body.clock-large #seconds {
     font-size: 0.23em;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -300,55 +385,24 @@ button:focus-visible,
     font-variation-settings: "wdth" 90, "opsz" 48;
 }
 
-/* Righello dei secondi: 60 tacche, ogni 5 una più lunga */
-.ruler {
-    position: relative;
+body.clock-large .ruler {
     height: clamp(18px, 3vh, 34px);
     margin-top: clamp(16px, 3.2vh, 38px);
-    color: var(--on-bg);
 }
 
-.ruler-base,
-.ruler-fill {
-    position: absolute;
-    inset: 0;
-    -webkit-mask:
-        repeating-linear-gradient(90deg, #000 0 2px, transparent 2px calc(100% / 60)) 0 100% / 100% 50% no-repeat,
-        repeating-linear-gradient(90deg, #000 0 3px, transparent 3px calc(100% / 12)) 0 100% / 100% 100% no-repeat;
-    mask:
-        repeating-linear-gradient(90deg, #000 0 2px, transparent 2px calc(100% / 60)) 0 100% / 100% 50% no-repeat,
-        repeating-linear-gradient(90deg, #000 0 3px, transparent 3px calc(100% / 12)) 0 100% / 100% 100% no-repeat;
+body.clock-large .ruler-ticks i::before {
+    width: 3px;
+    margin-left: -1.5px;
 }
 
-.ruler-base {
-    background: currentColor;
-    opacity: 0.22;
+body.clock-large .ruler-ticks i.major::before {
+    width: 4px;
+    margin-left: -2px;
 }
 
-.ruler-fill {
-    background: var(--theme-color);
-    background: color-mix(in srgb, var(--subject, var(--theme-color)) 88%, var(--ink));
-    clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0);
-    transition: clip-path 1s linear, background-color 0.8s ease;
-}
-
-.ruler-fill.no-anim {
-    transition: none;
-}
-
-.date {
+body.clock-large .date {
     margin-top: clamp(16px, 3vh, 36px);
-    font-family: var(--font);
     font-size: clamp(19px, 2.9vw, 54px);
-    font-weight: 500;
-    letter-spacing: -0.012em;
-    font-variation-settings: "wdth" 100, "opsz" 36;
-    color: var(--on-bg-soft);
-    transition: color 0.6s ease;
-}
-
-.date::first-letter {
-    text-transform: uppercase;
 }
 
 /* --- DOCK (pulsanti) ------------------------------------------------------- */
@@ -379,41 +433,25 @@ button:focus-visible,
 
 .icon-button {
     flex: none;
-    min-width: var(--dock);
+    width: var(--dock);
     height: var(--dock);
-    padding: 0 14px;
-    border-radius: 22px;
+    padding: 0;
+    border-radius: 50%;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    background: var(--surface);
-    color: var(--icon, var(--text));
-    border: 1.5px solid var(--line);
+    background-color: var(--btn-bg, var(--theme-color));
+    color: var(--icon, #fff);
+    border: none;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
-    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.3s ease;
+    transition: transform 0.2s, background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
 }
 
 .icon-button i {
-    font-size: clamp(20px, 1.8vw, 28px);
+    font-size: calc(var(--dock) * 0.46);
     line-height: 1;
-}
-
-.icon-label {
-    display: none;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-@media (min-width: 1600px) {
-    .icon-label {
-        display: block;
-    }
 }
 
 .icon-button:active {
@@ -422,16 +460,13 @@ button:focus-visible,
 
 @media (hover: hover) {
     .icon-button:hover {
-        background: var(--theme-color);
-        color: #fff;
-        border-color: var(--theme-color);
+        transform: scale(1.05);
     }
 }
 
-.icon-button.is-primary {
-    background: var(--theme-color);
-    color: #fff;
-    border-color: var(--theme-color);
+/* L'unico pulsante che si distingue dagli altri */
+#githubIcon {
+    background-color: #333;
 }
 
 .icon-button.is-disabled {
@@ -439,6 +474,7 @@ button:focus-visible,
     filter: grayscale(0.45);
     cursor: not-allowed;
     pointer-events: none;
+    transform: none;
 }
 
 /* --- PILLOLA DI STATO ------------------------------------------------------ */
@@ -693,8 +729,7 @@ button:focus-visible,
     animation: fadeInUp 0.4s ease forwards;
 }
 
-.event-pill-item:active,
-.day-detail-item:active {
+.event-pill-item:active {
     transform: scale(0.98);
 }
 
@@ -722,14 +757,12 @@ button:focus-visible,
     color: var(--muted);
 }
 
-.event-pill-item.type-interrogazione .event-pill-item-type-badge,
-.day-detail-item.type-interrogazione .event-pill-item-type-badge {
+.event-pill-item.type-interrogazione .event-pill-item-type-badge {
     background-color: var(--amber-bg);
     color: var(--amber-fg);
 }
 
-.event-pill-item.type-verifica .event-pill-item-type-badge,
-.day-detail-item.type-verifica .event-pill-item-type-badge {
+.event-pill-item.type-verifica .event-pill-item-type-badge {
     background-color: var(--red-bg);
     color: var(--red-fg);
 }
@@ -1573,268 +1606,16 @@ input:checked+.toggle-slider::before {
     font-weight: 500;
 }
 
-/* --- CALENDARIO MENSILE ---------------------------------------------------------- */
-.month-calendar-modal {
-    width: min(95vw, clamp(640px, 42vw, 940px));
-    overflow-x: hidden;
-}
-
-.calendar-nav-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    background-color: var(--theme-color);
-    color: #fff;
-}
-
-.calendar-nav-header h3 {
-    font-size: clamp(22px, 2.1vw, 30px);
-}
-
-.calendar-nav-btn {
-    flex: none;
-    width: 52px;
-    height: 52px;
-    min-height: 0;
-    padding: 0;
-    border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.2);
-    color: #fff;
-    font-size: 18px;
-}
-
-.calendar-body {
-    padding: 14px var(--pad-x) 0;
-}
-
-.calendar-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
-    margin-bottom: 8px;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--muted);
-}
-
-.month-calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
-}
-
-.calendar-day-cell {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    height: clamp(48px, 8.4vh, 84px);
-    padding-top: clamp(6px, 1.2vh, 11px);
-    background-color: var(--surface-2);
-    border-radius: 16px;
-    font-size: clamp(16px, 1.4vw, 21px);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.15s ease;
-}
-
-.calendar-day-cell:active {
-    transform: scale(0.95);
-}
-
-.calendar-day-cell.empty {
-    background-color: transparent;
-    cursor: default;
-}
-
-.calendar-day-cell.today {
-    background-color: var(--surface);
-    color: var(--theme-color);
-    box-shadow: inset 0 0 0 2.5px var(--theme-color);
-}
-
-.calendar-day-cell.disabled {
-    opacity: 0.38;
-    cursor: default;
-    pointer-events: none;
-}
-
-.calendar-day-cell.has-events {
-    cursor: pointer;
-}
-
-@media (hover: hover) {
-    .calendar-day-cell:not(.disabled):not(.empty):hover {
-        background-color: var(--surface-3);
-    }
-}
-
-.event-dots-container {
-    display: flex;
-    gap: 4px;
-    margin-top: 4px;
-}
-
-.event-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-}
-
-.event-dot.interrogazione {
-    background-color: #F2A900;
-}
-
-.event-dot.verifica {
-    background-color: #D6361F;
-}
-
-/* Dettaglio giorno */
-.day-detail-modal {
-    width: min(92vw, clamp(500px, 30vw, 680px));
-}
-
-.day-detail-content {
-    padding: 8px var(--pad-x) 0;
-}
-
-.day-detail-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.day-detail-item {
-    padding: 14px 16px;
-    background-color: var(--surface-2);
-    border-radius: 20px;
-    text-align: left;
-    cursor: pointer;
-    transition: transform 0.18s ease;
-}
-
-/* --- CALENDARIO DELL'AVVENTO (tema Natale) ---------------------------------------- */
-#calendarModal {
-    overflow-x: hidden;
-}
-
-.calendar-header-wrapper {
-    position: relative;
-    overflow: hidden;
-    padding: 34px 20px;
-    text-align: center;
-    color: #fff;
-    background: linear-gradient(to top right, #c0392b, #ef5350);
-}
-
-.snow-container {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-}
-
-.snowflake {
-    position: absolute;
-    top: -10px;
-    z-index: 1000;
-    color: #fff;
-    font-family: Arial, sans-serif;
-    font-size: 1em;
-    user-select: none;
-    animation-name: fall;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-}
-
-@keyframes fall {
-    0% {
-        transform: translateY(-10px) translateX(0);
-        opacity: 0.8;
-    }
-
-    100% {
-        transform: translateY(200px) translateX(20px);
-        opacity: 0;
-    }
-}
-
-.calendar-header-content {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-.days-count {
-    font-size: clamp(56px, 6vw, 84px);
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.04em;
-    font-variation-settings: "wdth" 75, "opsz" 96;
-}
-
-.countdown-label {
-    margin-top: 6px;
-    font-size: 20px;
-    font-weight: 500;
-    opacity: 0.92;
-}
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 10px;
-    margin-bottom: 6px;
-}
-
-.calendar-day {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 1;
-    background-color: var(--surface);
-    color: var(--text);
-    border: 1.5px solid var(--line);
-    border-radius: 16px;
-    font-size: 19px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-}
-
-.calendar-day.active {
-    background-color: #dc2626;
-    border-color: #dc2626;
-    color: #fff;
-}
-
-.calendar-day.future-month {
-    background-color: var(--surface-2);
-    border-color: var(--surface-2);
-    color: #b9bdc9;
-}
-
-#closeCalendarModal {
-    background-color: #dc2626;
-}
-
 /* --- TEMI A EVENTO ------------------------------------------------------------------
    script.js aggiunge/toglie la classe sul body e imposta --theme-color.
-   Sullo sfondo c'è una foto: il testo diventa bianco, i pulsanti restano bianchi
-   con l'icona nel colore del tema. */
+   Sullo sfondo c'è una foto: il testo diventa bianco, i pulsanti diventano bianchi
+   con l'icona nel colore del tema (GitHub resta nel colore del tema). */
 body.christmas-theme,
 body.stranger-things-theme,
 body.halloween-theme {
     --on-bg: #ffffff;
     --on-bg-soft: rgba(255, 255, 255, 0.86);
+    --btn-bg: #ffffff;
     --icon: var(--theme-color);
     --status-color: var(--theme-color);
     --pulse-color: var(--theme-color);
@@ -1861,25 +1642,16 @@ body.halloween-theme .ribbon-seg {
     backdrop-filter: blur(8px);
 }
 
-body.christmas-theme .ruler-fill,
-body.stranger-things-theme .ruler-fill,
-body.halloween-theme .ruler-fill {
-    background: #ffffff;
-}
-
-body.christmas-theme .icon-button.is-primary,
-body.stranger-things-theme .icon-button.is-primary,
-body.halloween-theme .icon-button.is-primary {
-    background: #fff;
-    border-color: #fff;
-    color: var(--theme-color);
+body.christmas-theme .ruler,
+body.stranger-things-theme .ruler,
+body.halloween-theme .ruler {
+    --tick-on: #ffffff;
 }
 
 body.christmas-theme #githubIcon,
 body.stranger-things-theme #githubIcon,
 body.halloween-theme #githubIcon {
-    background: var(--theme-color);
-    border-color: var(--theme-color);
+    background-color: var(--theme-color);
     color: #fff;
 }
 
@@ -1917,13 +1689,8 @@ body.halloween-theme #githubIcon {
         gap: 4px;
     }
 
-    .icon-button {
-        padding: 0 8px;
-        border-radius: 15px;
-    }
-
-    .icon-button i {
-        font-size: 18px;
+    .clock {
+        font-size: calc(4rem * var(--fit, 1));
     }
 
     .modal {
@@ -1947,7 +1714,7 @@ body.halloween-theme #githubIcon {
         font-size: 12px;
     }
 
-    #seconds {
+    body.clock-large #seconds {
         font-size: 0.2em;
     }
 
@@ -1986,20 +1753,6 @@ body.halloween-theme #githubIcon {
         border-bottom-width: 3px;
     }
 
-    .calendar-grid {
-        gap: 6px;
-    }
-
-    .calendar-day {
-        border-radius: 11px;
-        font-size: 15px;
-    }
-
-    .month-calendar-grid,
-    .calendar-weekdays {
-        gap: 5px;
-    }
-
     .event-pill-item {
         min-width: 0;
     }
@@ -2009,9 +1762,9 @@ body.halloween-theme #githubIcon {
     }
 }
 
-/* In verticale le cifre si impilano: ore sopra, minuti sotto */
+/* Orologio grande in verticale: le cifre si impilano, ore sopra e minuti sotto */
 @media (orientation: portrait) {
-    .clock {
+    body.clock-large .clock {
         flex-direction: column;
         align-items: center;
         font-size: calc(min(62vw, 31vh) * var(--fit, 1));
@@ -2019,46 +1772,520 @@ body.halloween-theme #githubIcon {
     }
 
     /* il righello occupa tutta la larghezza: le tacche restano distinte */
-    .clock-container,
-    .clock-stack {
+    body.clock-large .clock-container,
+    body.clock-large .clock-stack {
         width: 100%;
     }
 
-    .clock .separator {
+    body.clock-large .clock .separator {
         display: none;
     }
 
-    #seconds {
+    body.clock-large #seconds {
         margin: 0.34em 0 0;
         font-size: 0.17em;
         letter-spacing: 0.02em;
     }
 
-    .ruler {
+    body.clock-large .ruler {
         margin-top: clamp(14px, 2.4vh, 28px);
     }
 
-    .date {
+    body.clock-large .date {
         font-size: clamp(18px, 5.2vw, 34px);
     }
 }
 
 /* Telefono in orizzontale: poco spazio verticale */
 @media (max-height: 480px) and (orientation: landscape) {
-    .clock {
+    body.clock-large .clock {
         font-size: calc(min(30vw, 40vh) * var(--fit, 1));
     }
 
-    .date {
+    body.clock-large .date {
         margin-top: 8px;
         font-size: clamp(16px, 2.6vw, 26px);
     }
 
-    .ruler {
+    body.clock-large .ruler {
         margin-top: 10px;
         height: 16px;
     }
 }
+
+/* ============================================================================
+   CALENDARI — DESIGN ORIGINALE, IDENTICO A PRIMA
+   Calendario mensile, dettaglio giorno e calendario dell'Avvento mantengono lo
+   stile della versione precedente (font Montserrat, pulsanti verdi arrotondati,
+   box-sizing di default). Le regole sotto "azzerano" le regole condivise del
+   nuovo design solo dentro queste tre finestre; poi seguono quelle originali.
+   ============================================================================ */
+.modal:where(#monthCalendarModal, #dayDetailModal, #calendarModal) {
+    width: 90%;
+    max-width: 600px;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+    padding: 0;
+    background-color: #fff;
+    color: #000;
+    border: none;
+    border-radius: 20px;
+    font-family: 'Montserrat', sans-serif;
+    transition: all 0.25s ease;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal),
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) * {
+    box-sizing: content-box;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) .modal-header {
+    padding: 0;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) .modal-header h3 {
+    margin: 1em 0;
+    font-size: 1.17em;
+    font-weight: 700;
+    line-height: normal;
+    letter-spacing: normal;
+    font-variation-settings: normal;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) .modal-footer {
+    position: static;
+    z-index: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 10px;
+    margin: 20px 0 0;
+    padding: 10px 0 0;
+    background: none;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) button {
+    box-sizing: border-box;
+    display: inline-block;
+    gap: 0;
+    min-height: 0;
+    margin: 0 5px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 50px;
+    background-color: var(--theme-color);
+    color: white;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: normal;
+    filter: none;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) button:hover,
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) button:active {
+    transform: scale(1.04);
+    filter: none;
+}
+
+:where(#monthCalendarModal, #dayDetailModal, #calendarModal) .modal-footer button {
+    border-radius: 20px;
+    padding: 10px 20px;
+}
+
+#calendarModal {
+    padding: 0;
+    /* Reset padding for custom header */
+    overflow: hidden;
+    /* Ensure rounded corners clip content */
+    display: none;
+    flex-direction: column;
+}
+
+.calendar-header-wrapper {
+    background: linear-gradient(to top right, #c0392b, #ef5350);
+    /* Medium dark red to lighter red */
+    padding: 30px 20px;
+    text-align: center;
+    color: white;
+    border-top-left-radius: 20px;
+    /* Concentric with modal */
+    border-top-right-radius: 20px;
+    position: relative;
+    /* For snow container */
+    overflow: hidden;
+    /* Keep snow inside */
+}
+
+.snow-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.snowflake {
+    position: absolute;
+    top: -10px;
+    color: white;
+    font-size: 1em;
+    font-family: Arial, sans-serif;
+    user-select: none;
+    z-index: 1000;
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes fall {
+    0% {
+        transform: translateY(-10px) translateX(0px);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translateY(200px) translateX(20px);
+        /* Adjust based on header height */
+        opacity: 0;
+    }
+}
+
+.calendar-header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    /* Above snow */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.days-count {
+    font-size: 3rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.countdown-label {
+    font-size: 1.2rem;
+    margin-top: 5px;
+    opacity: 0.9;
+    text-shadow: none;
+}
+
+.calendar-body {
+    padding: 10px 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    color: black;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    /* Slightly rounded */
+    font-weight: bold;
+    font-size: 1.1rem;
+    transition: transform 0.2s ease;
+}
+
+.calendar-day.active {
+    background-color: #dc2626;
+    color: white;
+    border-color: #dc2626;
+}
+
+.calendar-day.future-month {
+    background-color: #f0f0f0;
+    color: #ccc;
+    border-color: #f0f0f0;
+}
+
+/* Mobile adjustments for calendar */
+@media (max-width: 768px) {
+
+    .calendar-grid {
+        gap: 5px;
+    }
+
+    .calendar-day {
+        font-size: 0.9rem;
+        border-radius: 8px;
+    }
+
+    .days-count {
+        font-size: 2.5rem;
+    }
+}
+
+/* Fix spacing for calendar modal footer */
+#calendarModal .modal-footer {
+    padding: 15px 25px 25px 25px;
+    /* Equalize right and bottom spacing (approx) */
+    margin-top: 0;
+}
+
+#closeCalendarModal {
+    background-color: #dc2626 !important;
+    color: white !important;
+}
+
+/* L'overlay dietro ai calendari è quello di prima (più scuro, blur 10px) */
+body:has(#monthCalendarModal[style*="display: block"]) .overlay,
+body:has(#dayDetailModal[style*="display: block"]) .overlay,
+body:has(#calendarModal[style*="display: block"]) .overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+/* --- MONTHLY CALENDAR STYLES --- */
+.month-calendar-modal {
+    max-width: 600px;
+    width: 95%;
+    border-radius: 25px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.month-calendar-modal .modal-footer {
+    padding: 15px 25px 25px 25px;
+    margin-top: 0;
+}
+
+.calendar-nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--theme-color);
+    color: white;
+    padding: 15px 20px;
+}
+
+.calendar-nav-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.calendar-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: none;
+    /* Override default button hover scale */
+}
+
+.calendar-body {
+    padding: 15px;
+    overflow-x: auto;
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    min-width: 450px;
+}
+
+.month-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    min-width: 450px;
+}
+
+.calendar-day-cell {
+    /* Responsive height that shrinks on smaller windows but stays around square on normal ones */
+    height: clamp(40px, 9vh, 75px);
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 5px;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.calendar-day-cell:hover {
+    background-color: #e9ecef;
+}
+
+.calendar-day-cell.empty {
+    background-color: transparent;
+    cursor: default;
+}
+
+.calendar-day-cell.today {
+    background-color: #e3f2fd;
+    color: var(--theme-color);
+    border: 2px solid var(--theme-color);
+}
+
+.calendar-day-cell.disabled {
+    background-color: #f5f5f5;
+    color: #ccc;
+    cursor: default;
+    pointer-events: none;
+}
+
+.calendar-day-cell.has-events {
+    cursor: pointer;
+}
+
+/* Unify hover effect for all active days (future/today) */
+.calendar-day-cell:not(.disabled):hover {
+    background-color: #e9ecef;
+    /* Darken slightly */
+    transform: none;
+    /* No scale */
+    box-shadow: none;
+    /* No shadow */
+    z-index: auto;
+}
+
+/* Specific style for today to maintain visibility on hover */
+.calendar-day-cell.today:hover {
+    background-color: #d1e9fc;
+    /* Slightly darker blue than normal today */
+}
+
+.event-dots-container {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+}
+
+.event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.event-dot.interrogazione {
+    background-color: #ffc107;
+    /* Yellow */
+}
+
+.event-dot.verifica {
+    background-color: #dc3545;
+    /* Red */
+}
+
+/* Day Detail Modal Styles */
+.day-detail-modal {
+    max-width: 500px;
+    width: 90%;
+    border-radius: 25px;
+    padding: 20px;
+}
+
+.day-detail-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+.day-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Reuse event-pill-item styles for day detail list but adjust slightly */
+.day-detail-item {
+    background-color: #f8f9fa;
+    border-radius: 16px;
+    padding: 15px;
+    text-align: left;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    cursor: pointer;
+}
+
+.day-detail-item:hover {
+
+    /* transform: scale(1.02); Removed as requested */
+    /* background-color: #fff; Removed */
+    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); Removed */
+}
+
+/* Voci del dettaglio giorno: stesso aspetto di prima (usano le classi della pillola) */
+.day-detail-item .event-pill-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 4px;
+}
+
+.day-detail-item .event-pill-item-subject {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: normal;
+    color: #333;
+}
+
+.day-detail-item .event-pill-item-type-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    background-color: #eee;
+    color: #666;
+}
+
+.day-detail-item .event-pill-item-details {
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.day-detail-item .event-pill-item-details i {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
 
 /* --- MOVIMENTO RIDOTTO ---------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
