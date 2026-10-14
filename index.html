@@ -19,10 +19,10 @@
     <!-- Font: Bricolage Grotesque (design v5) + i font opzionali delle Impostazioni, in un'unica richiesta -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Instrument+Serif:ital@0;1&family=Orbitron:wght@400..900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Syne:wght@400..800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Instrument+Serif:ital@0;1&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@400..900&family=Rubik:ital,wght@0,300..900;1,300..900&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Syne:wght@400..800&display=swap"
         rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=5.0">
+    <link rel="stylesheet" href="style.css?v=5.1">
 
     <link rel="preload" as="image"
         href="https://res.cloudinary.com/dk0f2y0hu/image/upload/v1763217481/christmas-desktop_wel7lu.png"
@@ -46,6 +46,7 @@
     <script>
         (function () {
             try {
+                if (localStorage.getItem('clockLarge') === 'true') document.body.classList.add('clock-large');
                 const savedBackground = localStorage.getItem('clockBackground');
                 if (savedBackground === 'stranger_things') {
                     document.body.style.backgroundColor = '#000000'; // Dark background for Stranger Things
@@ -81,8 +82,7 @@
                 </div>
                 <!-- Righello dei secondi: 60 tacche che si colorano -->
                 <div class="ruler" aria-hidden="true">
-                    <div class="ruler-base"></div>
-                    <div class="ruler-fill" id="rulerFill"></div>
+                    <div class="ruler-ticks" id="rulerTicks"></div>
                 </div>
             </div>
             <div class="date" id="date"></div>
@@ -91,22 +91,22 @@
 
     <nav class="dock" aria-label="Strumenti">
         <div id="backIcon" class="icon-button" role="button" tabindex="0" aria-label="Torna all'hub">
-            <i class="fas fa-arrow-left"></i><span class="icon-label">Hub</span>
+            <i class="fas fa-arrow-left"></i>
         </div>
         <div class="dock-tools">
             <div id="githubIcon" class="icon-button" role="button" tabindex="0" aria-label="Codice su GitHub">
-                <i class="fab fa-github"></i><span class="icon-label">Codice</span>
+                <i class="fab fa-github"></i>
             </div>
             <div id="calendarIcon" class="icon-button" role="button" tabindex="0" aria-label="Calendario dell'Avvento"
                 style="display: none;">
-                <i class="fas fa-tree"></i><span class="icon-label">Avvento</span>
+                <i class="fas fa-tree"></i>
             </div>
-            <div id="eventsCalendarIcon" class="icon-button is-primary" role="button" tabindex="0"
+            <div id="eventsCalendarIcon" class="icon-button" role="button" tabindex="0"
                 aria-label="Calendario verifiche e interrogazioni">
-                <i class="fas fa-calendar-alt"></i><span class="icon-label">Calendario</span>
+                <i class="fas fa-calendar-alt"></i>
             </div>
             <div id="editEventsMainIcon" class="icon-button" role="button" tabindex="0" aria-label="Gestione eventi">
-                <i class="fas fa-calendar-plus"></i><span class="icon-label">Gestione</span>
+                <i class="fas fa-calendar-plus"></i>
             </div>
             <!--
               PULSANTE ORARIO SCOLASTICO — riabilitato.
@@ -114,13 +114,13 @@
               Per disabilitarlo di nuovo: imposta quel flag a false.
             -->
             <div id="scheduleIcon" class="icon-button" role="button" tabindex="0" aria-label="Orario scolastico">
-                <i class="fas fa-table"></i><span class="icon-label">Orario</span>
+                <i class="fas fa-table"></i>
             </div>
             <div id="settingsIcon" class="icon-button" role="button" tabindex="0" aria-label="Impostazioni">
-                <i class="fas fa-cog"></i><span class="icon-label">Impostazioni</span>
+                <i class="fas fa-cog"></i>
             </div>
             <div id="infoIcon" class="icon-button" role="button" tabindex="0" aria-label="Informazioni">
-                <i class="fas fa-info"></i><span class="icon-label">Info</span>
+                <i class="fas fa-info"></i>
             </div>
         </div>
     </nav>
@@ -151,6 +151,13 @@
                     <option value="600">Semi-Grassetto</option>
                     <option value="900">Grassetto</option>
                 </select>
+                <div class="toggle-container">
+                    <span class="toggle-label">Orologio grande</span>
+                    <label class="toggle" for="largeClockToggle">
+                        <input type="checkbox" id="largeClockToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
             <div class="settings-section">
                 <h4>Sfondo</h4>
@@ -578,7 +585,7 @@
         </div>
     </div>
 
-    <script src="script.js?v=5.0"></script>
+    <script src="script.js?v=5.1"></script>
 </body>
 
 </html>
