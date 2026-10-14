@@ -603,7 +603,7 @@ function applyBackground(color) {
     lastAutoBackgroundColor = null;
 
     // Set theme color CSS variable
-    let themeColor = '#2340E8'; // Design v5: blu inchiostro (prima verde #1b912b)
+    let themeColor = '#1b912b'; // Verde originale
     if (color === 'natale') {
         themeColor = '#dc2626'; // Christmas Red
     } else if (color === 'stranger_things') {
@@ -1179,11 +1179,12 @@ async function updateEventsWidget() {
 }
 
 // Update expanded events view
-async function updateExpandedEventsView() {
+async function updateExpandedEventsView(preloadedEvents) {
     const eventsWidget = document.getElementById('events-widget');
     if (!eventsWidget) return;
 
-    const events = await getUpcomingEvents(7);
+    // Se gli eventi sono già disponibili (cache) non si aspetta la rete: il rendering è immediato
+    const events = preloadedEvents || await getUpcomingEvents(7);
     const displayEvents = events.slice(0, 3); // Max 3 events
 
     if (displayEvents.length === 0) {
@@ -1395,7 +1396,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const infoContent = document.querySelector('#infoModal p');
     if (infoContent) {
-        infoContent.innerHTML = 'Questo orologio digitale mostra l\'ora esatta di Roma (Italia) con precisione al secondo. ' + 'Sincronizzato per garantire la massima precisione.' + '<br><br>' + 'Creato da <a href="https://lollo.dpdns.org/" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">lollo21</a> - v5.0';
+        infoContent.innerHTML = 'Questo orologio digitale mostra l\'ora esatta di Roma (Italia) con precisione al secondo. ' + 'Sincronizzato per garantire la massima precisione.' + '<br><br>' + 'Creato da <a href="https://lollo.dpdns.org/" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">lollo21</a> - v5.1';
     }
     if (githubIcon) githubIcon.addEventListener('click', () => window.open('https://github.com/lollo21x/clock', '_blank'));
     if (backIcon) backIcon.addEventListener('click', () => window.location.href = 'https://hub5d.lollo.dpdns.org');
@@ -1442,142 +1443,158 @@ document.addEventListener('DOMContentLoaded', function () {
     scheduleWidget.classList.remove('active');
     eventsWidget.classList.remove('active');
 
-    // Pill click handler for expansion - FLIP Animation
+    // ------------------------------------------------------------------------
+    // Animazione della pillola (design v5.1)
+    // Un solo "morph" fluido (Web Animations API) tra stato chiuso e aperto:
+    //  1. il vecchio contenuto sfuma via in 90ms
+    //  2. la pillola passa allo stato finale, si misura, e anima larghezza/altezza/raggio
+    //  3. il nuovo contenuto sfuma dentro mentre la pillola sta ancora crescendo
+    // Il contenuto resta alla larghezza finale: il testo non va a capo durante l'animazione.
+    // I dati degli eventi si leggono dalla cache locale: niente attesa di Firebase prima di animare.
+    // ------------------------------------------------------------------------
+    const PILL_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let pillAnim = null;
+    let contentAnim = null;
+
+    function pillRadius(h) {
+        const r = parseFloat(window.getComputedStyle(statusPill).borderTopLeftRadius) || 0;
+        return Math.min(r, h / 2);
+    }
+
+    function morphPill(applyFinalState, duration, keepContent) {
+        // dimensioni di partenza (anche se un'animazione precedente è ancora in corso)
+        const first = statusPill.getBoundingClientRect();
+        const fromRadius = pillRadius(first.height);
+        if (pillAnim) { pillAnim.cancel(); pillAnim = null; }
+        if (contentAnim) { contentAnim.cancel(); contentAnim = null; }
+
+        // passa subito allo stato finale (senza transizioni CSS) e misura com'è davvero
+        statusPill.style.transition = 'none';
+        statusPill.style.width = '';
+        statusPill.style.height = '';
+        statusPill.style.maxWidth = '';
+        statusPill.style.maxHeight = '';
+        statusPill.style.minWidth = '';
+        statusPill.style.minHeight = '';
+        widgetContainer.style.width = '';
+        applyFinalState();
+        const last = statusPill.getBoundingClientRect();
+        const toRadius = pillRadius(last.height);
+
+        // contenuto bloccato alla larghezza finale
+        const cs = window.getComputedStyle(statusPill);
+        const innerW = last.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+            - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+        widgetContainer.style.width = innerW + 'px';
+        widgetContainer.style.flex = 'none';
+
+        // durante il morph i limiti del CSS finale non devono "tagliare" i valori intermedi
+        statusPill.style.maxWidth = 'none';
+        statusPill.style.maxHeight = 'none';
+        statusPill.style.minWidth = '0';
+        statusPill.style.minHeight = '0';
+        statusPill.style.willChange = 'width, height, border-radius';
+
+        const dur = reduceMotion ? 1 : duration;
+        pillAnim = statusPill.animate([
+            { width: first.width + 'px', height: first.height + 'px', borderRadius: fromRadius + 'px' },
+            { width: last.width + 'px', height: last.height + 'px', borderRadius: toRadius + 'px' }
+        ], { duration: dur, easing: PILL_EASE });
+
+        // il nuovo contenuto compare mentre la pillola si sta ancora muovendo
+        widgetContainer.style.transition = 'none';
+        widgetContainer.style.opacity = '1';
+        if (!keepContent) contentAnim = widgetContainer.animate([
+            { opacity: 0, transform: 'translateY(6px)' },
+            { opacity: 1, transform: 'translateY(0)' }
+        ], { duration: reduceMotion ? 1 : 300, delay: reduceMotion ? 0 : Math.round(duration * 0.22), easing: 'ease-out', fill: 'backwards' });
+
+        const finish = () => {
+            pillAnim = null;
+            contentAnim = null;
+            statusPill.style.width = '';
+            statusPill.style.height = '';
+            statusPill.style.maxWidth = '';
+            statusPill.style.maxHeight = '';
+            statusPill.style.minWidth = '';
+            statusPill.style.minHeight = '';
+            statusPill.style.willChange = '';
+            statusPill.style.transition = '';
+            widgetContainer.style.width = '';
+            widgetContainer.style.flex = '';
+        };
+        const thisAnim = pillAnim;
+        thisAnim.onfinish = () => { if (pillAnim === thisAnim) finish(); };
+    }
+
+    function fadeOutPillContent() {
+        widgetContainer.style.transition = 'opacity 90ms ease';
+        widgetContainer.style.opacity = '0';
+    }
+
+    function readCachedUpcomingEvents() {
+        try {
+            const raw = localStorage.getItem('cached_upcoming_events');
+            if (!raw) return null;
+            const today = formatDateForStorage(new Date());
+            return JSON.parse(raw).filter(ev => ev.date >= today);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    // Apertura
     statusPill.addEventListener('click', async function (e) {
         e.stopPropagation();
-        if (!isPillExpanded) {
-            isPillExpanded = true;
+        if (isPillExpanded) return;
+        isPillExpanded = true;
 
-            // 1. Lock current dimensions & styles
-            const startRect = statusPill.getBoundingClientRect();
-            const startWidth = startRect.width;
-            const startHeight = startRect.height;
-            const startStyle = window.getComputedStyle(statusPill);
-            const startBorderRadius = startStyle.borderRadius;
+        fadeOutPillContent();
+        const cached = readCachedUpcomingEvents();
 
-            statusPill.style.width = startWidth + 'px';
-            statusPill.style.height = startHeight + 'px';
-            statusPill.style.borderRadius = startBorderRadius;
-            statusPill.style.maxWidth = 'none';
-            statusPill.style.maxHeight = 'none';
-            statusPill.style.minHeight = '0';
-            // Disable transitions to prevent interference during setup
-            statusPill.style.transition = 'none';
+        setTimeout(async () => {
+            if (!isPillExpanded) return;   // chiusa nel frattempo
+            // senza cache non si può evitare di aspettare i dati (primo avvio / nuovo dispositivo)
+            const events = cached || await getUpcomingEvents(7);
+            if (!isPillExpanded) return;
 
-            // 2. Fade out content
-            widgetContainer.style.transition = 'opacity 0.15s ease';
-            widgetContainer.style.opacity = '0';
-
-            setTimeout(async () => {
-                // 3. Prepare target state (invisible)
-                // We must disable transitions GLOBALLY on the element to measure correctly
-                statusPill.style.transition = 'none';
-
+            morphPill(() => {
                 syncWidget.classList.remove('active');
                 scheduleWidget.classList.remove('active');
                 eventsWidget.classList.remove('active');
                 statusPill.classList.remove('sync-view', 'schedule-view');
-
                 statusPill.classList.add('expanded');
                 eventsWidget.classList.add('active');
+                updateExpandedEventsView(events);   // sincrono: gli eventi sono già in mano
+            }, 560);
 
-                await updateExpandedEventsView();
-
-                // 4. Measure target dimensions
-                // CRITICAL: Clear constraints so we measure what the CSS class actually dictates
-                statusPill.style.maxWidth = '';
-                statusPill.style.maxHeight = '';
-                statusPill.style.minHeight = ''; // Clear min-height to allow CSS min-height to apply
-                statusPill.style.width = 'auto';
-                statusPill.style.height = 'auto';
-                statusPill.style.borderRadius = '';
-
-                // Force reflow to ensure we get the correct auto dimensions without transitions
-                statusPill.offsetHeight;
-
-                const targetRect = statusPill.getBoundingClientRect();
-                const targetWidth = targetRect.width;
-                const targetHeight = targetRect.height;
-                const targetStyle = window.getComputedStyle(statusPill);
-                const targetBorderRadius = targetStyle.borderRadius;
-
-                // 5. Re-apply start dimensions immediately
-                statusPill.style.width = startWidth + 'px';
-                statusPill.style.height = startHeight + 'px';
-                statusPill.style.borderRadius = startBorderRadius;
-                statusPill.style.maxWidth = 'none';
-                statusPill.style.maxHeight = 'none';
-                statusPill.style.minHeight = '0'; // Re-lock min-height for animation
-
-                // Force reflow
-                statusPill.offsetHeight;
-
-                // 6. Animate to target
-                // Enable transition explicitly for the animation
-                statusPill.style.transition = 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
-                statusPill.style.width = targetWidth + 'px';
-                statusPill.style.height = targetHeight + 'px';
-                statusPill.style.borderRadius = targetBorderRadius;
-
-                // 7. Fade in content
-                setTimeout(() => {
-                    widgetContainer.style.transition = 'opacity 0.3s ease';
-                    widgetContainer.style.opacity = '1';
-                }, 200);
-
-                // 8. Cleanup after animation
-                setTimeout(() => {
-                    // CRITICAL: Disable transition to prevent "squash" effect when reverting to CSS
-                    statusPill.style.transition = 'none';
-
-                    // Clear all inline styles to let CSS take over
-                    statusPill.style.width = '';
-                    statusPill.style.height = '';
-                    statusPill.style.borderRadius = '';
-                    statusPill.style.maxWidth = '';
-                    statusPill.style.maxHeight = '';
-                    statusPill.style.minHeight = '';
-
-                    // Force reflow to apply these changes instantly without animation
-                    statusPill.offsetHeight;
-
-                    // Restore CSS transitions for future interactions
-                    statusPill.style.transition = '';
-                }, 600);
-
-            }, 150);
-        }
+            // aggiorna in silenzio con i dati freschi, solo se qualcosa è cambiato
+            if (cached) {
+                getUpcomingEvents(7).then(fresh => {
+                    if (isPillExpanded && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                        // se la pillola sta ancora animando, aspetta che finisca; poi si adatta con un morph breve
+                        const apply = () => {
+                            if (!isPillExpanded) return;
+                            morphPill(() => { updateExpandedEventsView(fresh); }, 340, true);
+                        };
+                        if (pillAnim) pillAnim.finished.then(apply).catch(() => { }); else apply();
+                    }
+                }).catch(() => { });
+            }
+        }, reduceMotion ? 0 : 90);
     });
 
-    // Click outside to collapse - FLIP Animation
+    // Chiusura (clic fuori dalla pillola)
     document.addEventListener('click', function (e) {
-        if (isPillExpanded && !statusPill.contains(e.target)) {
-            isPillExpanded = false;
+        if (!isPillExpanded || statusPill.contains(e.target)) return;
+        isPillExpanded = false;
 
-            // 1. Lock current dimensions
-            const startRect = statusPill.getBoundingClientRect();
-            const startWidth = startRect.width;
-            const startHeight = startRect.height;
-            const startStyle = window.getComputedStyle(statusPill);
-            const startBorderRadius = startStyle.borderRadius;
+        fadeOutPillContent();
 
-            statusPill.style.width = startWidth + 'px';
-            statusPill.style.height = startHeight + 'px';
-            statusPill.style.borderRadius = startBorderRadius;
-            statusPill.style.maxWidth = 'none';
-            statusPill.style.maxHeight = 'none';
-            statusPill.style.minHeight = '0';
-            statusPill.style.transition = 'none';
-
-            // 2. Fade out content
-            widgetContainer.style.transition = 'opacity 0.15s ease';
-            widgetContainer.style.opacity = '0';
-
-            setTimeout(() => {
-                // 3. Prepare target state
-                // Disable transitions for measurement
-                statusPill.style.transition = 'none';
-
+        setTimeout(() => {
+            if (isPillExpanded) return;   // riaperta nel frattempo
+            morphPill(() => {
                 const widgets = [syncWidget, scheduleWidget, eventsWidget];
                 eventsWidget.classList.remove('active');
                 widgets[currentWidgetIndex].classList.add('active');
@@ -1598,71 +1615,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 statusPill.classList.remove('expanded');
-
-                // 4. Measure target dimensions
-                statusPill.style.maxWidth = '';
-                statusPill.style.maxHeight = '';
-                statusPill.style.minHeight = ''; // Clear min-height to allow CSS min-height (50px) to apply
-                statusPill.style.minWidth = ''; // Clear min-width to allow CSS min-width to apply
-                statusPill.style.width = 'auto';
-                statusPill.style.height = 'auto';
-                statusPill.style.borderRadius = '';
-
-                // Force reflow
-                statusPill.offsetHeight;
-
-                const targetRect = statusPill.getBoundingClientRect();
-                const targetWidth = targetRect.width;
-                // Force 50px height for collapsed state as requested
-                const targetHeight = parseFloat(window.getComputedStyle(statusPill).minHeight) || 50;
-                const targetStyle = window.getComputedStyle(statusPill);
-                const targetBorderRadius = targetStyle.borderRadius;
-
-                // 5. Re-apply start dimensions
-                statusPill.style.width = startWidth + 'px';
-                statusPill.style.height = startHeight + 'px';
-                statusPill.style.borderRadius = startBorderRadius;
-                statusPill.style.maxWidth = 'none';
-                statusPill.style.maxHeight = 'none';
-                statusPill.style.minHeight = '0'; // Re-lock min-height for animation
-                statusPill.style.minWidth = '0'; // Re-lock min-width for animation
-
-                // Force reflow
-                statusPill.offsetHeight;
-
-                // 6. Animate to target
-                statusPill.style.transition = 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
-                statusPill.style.width = targetWidth + 'px';
-                statusPill.style.height = targetHeight + 'px';
-                statusPill.style.borderRadius = targetBorderRadius;
-
-                // 7. Fade in content
-                setTimeout(() => {
-                    widgetContainer.style.transition = 'opacity 0.3s ease';
-                    widgetContainer.style.opacity = '1';
-                }, 200);
-
-                // 8. Cleanup
-                setTimeout(() => {
-                    // CRITICAL: Disable transition to prevent "squash" effect when reverting to CSS
-                    statusPill.style.transition = 'none';
-
-                    statusPill.style.width = '';
-                    statusPill.style.height = '';
-                    statusPill.style.borderRadius = '';
-                    statusPill.style.maxWidth = '';
-                    statusPill.style.maxHeight = '';
-                    statusPill.style.minHeight = '';
-                    statusPill.style.minWidth = '';
-
-                    // Force reflow to apply these changes instantly without animation
-                    statusPill.offsetHeight;
-
-                    statusPill.style.transition = '';
-                }, 600);
-
-            }, 150);
-        }
+            }, 460);
+        }, reduceMotion ? 0 : 90);
     });
 
     setInterval(() => {
@@ -2703,7 +2657,7 @@ document.addEventListener('DOMContentLoaded', function () {
  * Solo presentazione: legge i dati già presenti (orarioScolastico, fasceOrarie,
  * materiaColori) e non modifica nessuna logica esistente.
  *   - striscia della giornata (#day-ribbon): ore di oggi + ago dell'ora corrente
- *   - righello dei secondi (#rulerFill): 60 tacche che si colorano
+ *   - righello dei secondi (#rulerTicks): 60 tacche che si accendono una a una
  *   - variabile CSS --subject: colore della materia in corso (solo sfondo automatico)
  *   - adattamento automatico della grandezza dell'orologio ai font più larghi
  *   - accessibilità: tasto Invio/Spazio sui pulsanti, Esc per chiudere le finestre
@@ -2807,18 +2761,34 @@ function updateDayRibbon(now) {
     ribbon.dataset.live = (minutes >= first.start && minutes < last.end) ? 'true' : 'false';
 }
 
-function updateSecondsRuler(now) {
-    const fill = document.getElementById('rulerFill');
-    if (!fill) return;
-    const s = now.getSeconds();
-    if (s === 0) {                      // al giro del minuto riparte da capo senza animare all'indietro
-        fill.classList.add('no-anim');
-        document.documentElement.style.setProperty('--p', String(1 / 60));
-        void fill.offsetWidth;
-        requestAnimationFrame(() => fill.classList.remove('no-anim'));
-    } else {
-        document.documentElement.style.setProperty('--p', String((s + 1) / 60));
+// Righello dei secondi: 60 tacche vere (una per secondo). Si accendono una a una
+// e si spengono tutte al giro del minuto. Nessun trucco CSS: funziona su ogni browser.
+let rulerTicks = null;
+let rulerLastSecond = -1;
+
+function buildRulerTicks() {
+    const box = document.getElementById('rulerTicks');
+    if (!box) return null;
+    box.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 60; i++) {
+        const t = document.createElement('i');
+        if (i % 5 === 0) t.className = 'major';
+        frag.appendChild(t);
     }
+    box.appendChild(frag);
+    return Array.from(box.children);
+}
+
+function updateSecondsRuler(now) {
+    if (!rulerTicks || !rulerTicks.length) rulerTicks = buildRulerTicks();
+    if (!rulerTicks) return;
+    const s = now.getSeconds();
+    for (let i = 0; i < 60; i++) {
+        const on = i <= s;
+        if (rulerTicks[i].classList.contains('on') !== on) rulerTicks[i].classList.toggle('on', on);
+    }
+    rulerLastSecond = s;
 }
 
 function updateSubjectColor(now) {
@@ -2836,19 +2806,36 @@ function updateClockVisuals(now) {
     updateDayRibbon(now);
 }
 
-// Adatta la grandezza dell'orologio quando il font scelto è più largo dello schermo
+// Adatta la grandezza dell'orologio allo spazio disponibile (larghezza E altezza):
+// serve con i font larghi e sugli schermi bassi (LIM con barre del browser, zoom di Windows...).
 function fitClock() {
     const clock = document.querySelector('.clock');
     const stage = document.querySelector('.stage');
-    if (!clock || !stage) return;
+    const container = document.querySelector('.clock-container');
+    const ribbon = document.getElementById('day-ribbon');
+    if (!clock || !stage || !container) return;
     const root = document.documentElement;
     root.style.setProperty('--fit', '1');
-    const available = stage.clientWidth * 0.96;
+
+    const cs = getComputedStyle(stage);
+    const availW = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const ribbonH = ribbon ? ribbon.offsetHeight : 0;
+    const availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - ribbonH - 8;
+
     // larghezza reale del contenuto (scrollWidth non conta l'overflow a sinistra di un flex centrato)
     clock.style.width = 'max-content';
-    const needed = clock.getBoundingClientRect().width;
+    const needW = clock.getBoundingClientRect().width;
     clock.style.width = '';
-    if (needed > available) root.style.setProperty('--fit', String(Math.max(0.3, available / needed)));
+    let fit = needW > availW * 0.97 ? Math.max(0.25, (availW * 0.97) / needW) : 1;
+    root.style.setProperty('--fit', String(fit));
+
+    // altezza: qualche passata, perché data e righello non scalano con l'orologio
+    for (let i = 0; i < 4; i++) {
+        const needH = container.getBoundingClientRect().height;
+        if (needH <= availH) break;
+        fit = Math.max(0.25, fit * (availH / needH) * 0.97);
+        root.style.setProperty('--fit', String(fit));
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -2867,6 +2854,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const overlay = document.getElementById('overlay');
         if (e.key === 'Escape' && overlay && overlay.style.display === 'block') overlay.click();
     });
+
+    // Orologio grande: piccolo come prima di default, grande a richiesta (si salva subito)
+    const largeClockToggle = document.getElementById('largeClockToggle');
+    const isLarge = localStorage.getItem('clockLarge') === 'true';
+    document.body.classList.toggle('clock-large', isLarge);
+    if (largeClockToggle) {
+        largeClockToggle.checked = isLarge;
+        largeClockToggle.addEventListener('change', () => {
+            localStorage.setItem('clockLarge', largeClockToggle.checked ? 'true' : 'false');
+            document.body.classList.toggle('clock-large', largeClockToggle.checked);
+            fitClock();
+            setTimeout(fitClock, 120);
+        });
+    }
 
     // Adattamento orologio: all'avvio, al resize, al cambio font
     fitClock();
